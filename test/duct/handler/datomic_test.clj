@@ -11,6 +11,8 @@
 
 (def ^:dynamic *client* nil)
 
+(defmethod datomic/not-found? ":db.error/cas-failed" [_] true)
+
 (defn client-fixture
   [f]
   (with-open [c (memdb/client {})]

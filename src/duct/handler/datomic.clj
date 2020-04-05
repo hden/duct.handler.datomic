@@ -19,65 +19,44 @@
       :else nil)))
 
 (defmulti not-found? ex-cause)
-
-(defmethod not-found? ":db.error/cas-failed" [_] true)
 (defmethod not-found? :default [_] false)
 
 (defn- tag [m & args]
   (:tag m))
 
-(defmulti prepare-query tag)
-(defmethod prepare-query :default [{:keys [query]} {:keys [connection]} {:keys [args]}]
+(defmulti query tag)
+(defmethod query :default [{:keys [query]} {:keys [connection]} {:keys [args]}]
   (let [db (d/db connection)]
-    {:query query :args (into [db] args)}))
+    (map first (d/q {:query query :args (into [db] args)}))))
 
-(defmulti after-query tag)
-(defmethod after-query :default [_ _ coll]
-  (map first coll))
+(defmulti execute! tag)
+(defmethod execute! :default [_ {:keys [connection]} arg-map]
+  (let [{:keys [tx-data]} (d/transact connection (select-keys arg-map [:tx-data]))]
+    [(count tx-data)]))
 
-(defmulti prepare-execute tag)
-(defmethod prepare-execute :default [_ _ arg-map]
-  (select-keys arg-map [:tx-data]))
-
-(defmulti after-execute tag)
-(defmethod after-execute :default [_ _ {:keys [tx-data]}]
-  [(count tx-data)])
-
-(defmulti prepare-insert tag)
-(defmethod prepare-insert :default [_ _ arg-map]
-  (select-keys arg-map [:tx-data]))
-
-(defmulti after-insert tag)
-(defmethod after-insert :default [_ _ {:keys [tempids]}]
-  tempids)
+(defmulti insert! tag)
+(defmethod insert! :default [_ {:keys [connection]} arg-map]
+  (let [{:keys [tempids]} (d/transact connection (select-keys arg-map [:tx-data]))]
+    tempids))
 
 (extend-protocol sql/RelationalDatabase
   duct.database.datomic.Boundary
-  (query [db {:keys [id] :as args}]
+  (query [db {:keys [id] :as arg-map}]
     (let [options (get @stash id)]
-      (->> args
-           (prepare-query options db)
-           (d/q)
-           (after-query options db))))
+      (query options db arg-map)))
 
-  (execute! [{:keys [connection] :as db} {:keys [id] :as arg-map}]
+  (execute! [db {:keys [id] :as arg-map}]
     (try
       (let [options (get @stash id)]
-        (->> arg-map
-             (prepare-execute options db)
-             (d/transact connection)
-             (after-execute options db)))
+        (execute! options db arg-map))
       (catch Exception ex
         (if (not-found? ex)
           [0]
           (throw ex)))))
 
-  (insert! [{:keys [connection] :as db} {:keys [id] :as arg-map}]
+  (insert! [db {:keys [id] :as arg-map}]
     (let [options (get @stash id)]
-      (->> arg-map
-           (prepare-insert options db)
-           (d/transact connection)
-           (after-insert options db)))))
+      (insert! options db arg-map))))
 
 (defmethod ig/prep-key :duct.handler/datomic [_ opts]
   (if (:db opts)

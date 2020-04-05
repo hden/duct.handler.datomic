@@ -1,4 +1,4 @@
-# duct.handler.datomic
+# duct.handler.datomic [![CircleCI](https://circleci.com/gh/hden/duct.handler.datomic.svg?style=svg)](https://circleci.com/gh/hden/duct.handler.datomic) [![codecov](https://codecov.io/gh/hden/duct.handler.datomic/branch/master/graph/badge.svg)](https://codecov.io/gh/hden/duct.handler.datomic)
 
 A duct library for building simple database-driven handlers for the datomic database.
 
@@ -9,7 +9,7 @@ Ported from [duct.handler.sql](https://github.com/duct-framework/handler.sql)).
 To install, add the following to your project dependencies:
 
 ```
-[hden/duct.handler.datomic "0.1.0"]
+[hden/duct.handler.datomic "0.1.0-SNAPSHOT"]
 ```
 
 ## Usage

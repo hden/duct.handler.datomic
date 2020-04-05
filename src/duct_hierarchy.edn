@@ -1,0 +1,5 @@
+{:duct.handler/datomic           [:duct/handler]
+ :duct.handler.datomic/query     [:duct.handler/datomic]
+ :duct.handler.datomic/query-one [:duct.handler/datomic]
+ :duct.handler.datomic/execute   [:duct.handler/datomic]
+ :duct.handler.datomic/insert    [:duct.handler/datomic]}

@@ -35,6 +35,22 @@
 (defmethod after-query :default [_ _ coll]
   (map first coll))
 
+(defmulti prepare-execute tag)
+(defmethod prepare-execute :default [_ _ arg-map]
+  (select-keys arg-map [:tx-data]))
+
+(defmulti after-execute tag)
+(defmethod after-execute :default [_ _ {:keys [tx-data]}]
+  [(count tx-data)])
+
+(defmulti prepare-insert tag)
+(defmethod prepare-insert :default [_ _ arg-map]
+  (select-keys arg-map [:tx-data]))
+
+(defmulti after-insert tag)
+(defmethod after-insert :default [_ _ {:keys [tempids]}]
+  tempids)
+
 (extend-protocol sql/RelationalDatabase
   duct.database.datomic.Boundary
   (query [db {:keys [id] :as args}]
@@ -44,43 +60,51 @@
            (d/q)
            (after-query options db))))
 
-  (execute! [{:keys [connection]} arg-map]
+  (execute! [{:keys [connection] :as db} {:keys [id] :as arg-map}]
     (try
-      (let [{:keys [tx-data]} (d/transact connection arg-map)]
-        [(count tx-data)])
+      (let [options (get @stash id)]
+        (->> arg-map
+             (prepare-execute options db)
+             (d/transact connection)
+             (after-execute options db)))
       (catch Exception ex
         (if (not-found? ex)
           [0]
           (throw ex)))))
 
-  (insert! [{:keys [connection]} arg-map]
-    (let [{:keys [tempids]} (d/transact connection arg-map)]
-      tempids)))
+  (insert! [{:keys [connection] :as db} {:keys [id] :as arg-map}]
+    (let [options (get @stash id)]
+      (->> arg-map
+           (prepare-insert options db)
+           (d/transact connection)
+           (after-insert options db)))))
 
 (defmethod ig/prep-key :duct.handler/datomic [_ opts]
   (if (:db opts)
     opts
     (assoc opts :db (ig/ref :duct.database/datomic))))
 
-(defn- stash-options [{:as options :keys [args]}]
+(defn- stash-options! [{:as options :keys [args tx-data]}]
   (let [id (hash options)]
     (swap! stash assoc id options)
     (-> options
-      (dissoc :query)
-      (assoc :sql {:id id :args args}))))
+        (dissoc :query :tx-data)
+        (assoc :sql (cond-> {:id id}
+                      args (assoc :args args)
+                      tx-data (assoc :tx-data tx-data))))))
 
 (defmethod ig/init-key ::query
   [_ options]
-  (ig/init-key ::sql/query (stash-options options)))
+  (ig/init-key ::sql/query (stash-options! options)))
 
 (defmethod ig/init-key ::query-one
-  [_ {:as options :keys [query args]}]
-  (ig/init-key ::sql/query-one (stash-options options)))
+  [_ options]
+  (ig/init-key ::sql/query-one (stash-options! options)))
 
 (defmethod ig/init-key ::execute
   [_ options]
-  (ig/init-key ::sql/execute (assoc options :sql (select-keys options [:tx-data]))))
+  (ig/init-key ::sql/execute (stash-options! options)))
 
 (defmethod ig/init-key ::insert
   [_ options]
-  (ig/init-key ::sql/insert (assoc options :sql (select-keys options [:tx-data]))))
+  (ig/init-key ::sql/insert (stash-options! options)))

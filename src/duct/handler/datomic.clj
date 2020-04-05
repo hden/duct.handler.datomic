@@ -23,14 +23,26 @@
 (defmethod not-found? ":db.error/cas-failed" [_] true)
 (defmethod not-found? :default [_] false)
 
+(defn- tag [m & args]
+  (:tag m))
+
+(defmulti prepare-query tag)
+(defmethod prepare-query :default [{:keys [query]} {:keys [connection]} {:keys [args]}]
+  (let [db (d/db connection)]
+    {:query query :args (into [db] args)}))
+
+(defmulti after-query tag)
+(defmethod after-query :default [_ _ coll]
+  (map first coll))
+
 (extend-protocol sql/RelationalDatabase
   duct.database.datomic.Boundary
-  (query [{:keys [connection]} {:keys [id args]}]
-    (let [db (d/db connection)
-          query (get @stash id)
-          args (into [db] args)]
-      (map first
-           (d/q {:query query :args args}))))
+  (query [db {:keys [id] :as args}]
+    (let [options (get @stash id)]
+      (->> args
+           (prepare-query options db)
+           (d/q)
+           (after-query options db))))
 
   (execute! [{:keys [connection]} arg-map]
     (try
@@ -41,7 +53,7 @@
           [0]
           (throw ex)))))
 
-  (insert!  [{:keys [connection]} arg-map]
+  (insert! [{:keys [connection]} arg-map]
     (let [{:keys [tempids]} (d/transact connection arg-map)]
       tempids)))
 
@@ -50,21 +62,20 @@
     opts
     (assoc opts :db (ig/ref :duct.database/datomic))))
 
-(defn- stash-query [{:as options :keys [query args]}]
-  "Stash the query form and retrieve them later"
-  (let [id (hash query)]
-    (swap! stash assoc id query)
+(defn- stash-options [{:as options :keys [args]}]
+  (let [id (hash options)]
+    (swap! stash assoc id options)
     (-> options
       (dissoc :query)
       (assoc :sql {:id id :args args}))))
 
 (defmethod ig/init-key ::query
   [_ options]
-  (ig/init-key ::sql/query (stash-query options)))
+  (ig/init-key ::sql/query (stash-options options)))
 
 (defmethod ig/init-key ::query-one
   [_ {:as options :keys [query args]}]
-  (ig/init-key ::sql/query-one (stash-query options)))
+  (ig/init-key ::sql/query-one (stash-options options)))
 
 (defmethod ig/init-key ::execute
   [_ options]

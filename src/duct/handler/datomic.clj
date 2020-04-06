@@ -30,13 +30,13 @@
     (map first (d/q {:query query :args (into [db] args)}))))
 
 (defmulti execute! tag)
-(defmethod execute! :default [_ {:keys [connection]} arg-map]
-  (let [{:keys [tx-data]} (d/transact connection (select-keys arg-map [:tx-data]))]
+(defmethod execute! :default [_ {:keys [connection]} {:keys [args]}]
+  (let [{:keys [tx-data]} (d/transact connection args)]
     [(count tx-data)]))
 
 (defmulti insert! tag)
-(defmethod insert! :default [_ {:keys [connection]} arg-map]
-  (let [{:keys [tempids]} (d/transact connection (select-keys arg-map [:tx-data]))]
+(defmethod insert! :default [_ {:keys [connection]} {:keys [args]}]
+  (let [{:keys [tempids]} (d/transact connection args)]
     tempids))
 
 (extend-protocol sql/RelationalDatabase
@@ -63,14 +63,13 @@
     opts
     (assoc opts :db (ig/ref :duct.database/datomic))))
 
-(defn- stash-options! [{:as options :keys [args tx-data]}]
+(defn- stash-options! [{:as options :keys [args]}]
   (let [id (hash options)]
     (swap! stash assoc id options)
     (-> options
         (dissoc :query :tx-data)
         (assoc :sql (cond-> {:id id}
-                      args (assoc :args args)
-                      tx-data (assoc :tx-data tx-data))))))
+                      args (assoc :args args))))))
 
 (defmethod ig/init-key ::query
   [_ options]

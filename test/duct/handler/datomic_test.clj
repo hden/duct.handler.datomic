@@ -100,23 +100,23 @@
   (testing "execute"
     (is (= (ig/prep {::datomic/query
                      {:request '{{:keys [id]} :route-params, {:strs [body]} :form-params}
-                      :tx-data '[{:comment/id id :comment/body body}]}})
+                      :args    '{:tx-data [{:comment/id id :comment/body body}]}}})
            {::datomic/query
             {:db      (ig/ref :duct.database/datomic)
              :request '{{:keys [id]} :route-params, {:strs [body]} :form-params}
-             :tx-data '[{:comment/id id :comment/body body}]}})))
+             :args    '{:tx-data [{:comment/id id :comment/body body}]}}})))
 
   (testing "insert"
     (is (= (ig/prep {::datomic/query
                      {:request  '{[_ pid cid body] :ataraxy/result}
-                      :tx-data  '[{:db/id "tempid" :comment/id cid :comment/body body}
-                                  {:post/id pid :post/comments "tempid"}]
+                      :args     '{:tx-data [{:db/id "tempid" :comment/id cid :comment/body body}
+                                            {:post/id pid :post/comments "tempid"}]}
                       :location "/posts{/pid}/comments{/cid}"}})
            {::datomic/query
             {:db       (ig/ref :duct.database/datomic)
              :request  '{[_ pid cid body] :ataraxy/result}
-             :tx-data  '[{:db/id "tempid" :comment/id cid :comment/body body}
-                         {:post/id pid :post/comments "tempid"}]
+             :args     '{:tx-data [{:db/id "tempid" :comment/id cid :comment/body body}
+                                   {:post/id pid :post/comments "tempid"}]}
              :location "/posts{/pid}/comments{/cid}"}}))))
 
 (deftest query-test
@@ -278,7 +278,7 @@
         config  {::datomic/execute
                  {:db      db
                   :request '{[_ id body] :ataraxy/result}
-                  :tx-data '[{:comment/id id :comment/body body}]}}
+                  :args    '{:tx-data [{:comment/id id :comment/body body}]}}}
         handler (::datomic/execute (ig/init config))]
     (testing "valid update"
       (is (= (handler {:ataraxy/result [{} 1 "Average"]})
@@ -292,7 +292,7 @@
         config  {::datomic/execute
                  {:db      db
                   :request '{[_ id] :ataraxy/result}
-                  :tx-data '[[:db/retractEntity [:comment/id id]]]}}
+                  :args    '{:tx-data [[:db/retractEntity [:comment/id id]]]}}}
         handler (::datomic/execute (ig/init config))]
     (testing "valid retraction"
       (is (= (handler {:ataraxy/result [{} 1]})
@@ -311,7 +311,7 @@
         config  {::datomic/execute
                  {:db      db
                   :request '{[_ id from-value to-value] :ataraxy/result}
-                  :tx-data '[[:db/cas [:comment/id id] :comment/body from-value to-value]]}}
+                  :args    '{:tx-data [[:db/cas [:comment/id id] :comment/body from-value to-value]]}}}
         handler (::datomic/execute (ig/init config))]
     (testing "valid update"
       (is (= (handler {:ataraxy/result [{} 1 "Great!" "Okay"]})
@@ -334,8 +334,8 @@
           config  {::datomic/insert
                    {:db       db
                     :request '{[_ pid cid body] :ataraxy/result}
-                    :tx-data '[{:comment/id cid :comment/body body}
-                               {:post/id pid :post/comments cid}]
+                    :args    '{:tx-data [{:comment/id cid :comment/body body}
+                                         {:post/id pid :post/comments cid}]}
                     :location "/posts{/pid}/comments{/cid}"}}
           handler (::datomic/insert (ig/init config))]
       (is (= (handler {:ataraxy/result [{} 1 3 "New comment"]})
@@ -349,8 +349,8 @@
           config  {::datomic/insert
                    {:db       db
                     :request '{[_ pid cid body] :ataraxy/result}
-                    :tx-data '[{:db/id "tempid" :comment/id cid :comment/body body}
-                               {:post/id pid :post/comments "tempid"}]
+                    :args    '{:tx-data [{:db/id "tempid" :comment/id cid :comment/body body}
+                                         {:post/id pid :post/comments "tempid"}]}
                     :location "/posts{/pid}/comments{/tempid}"}}
           handler (::datomic/insert (ig/init config))]
       (is (= (handler {:ataraxy/result [{} 1 4 "New comment!"]})
@@ -365,8 +365,8 @@
           config {::datomic/insert
                   {:db      db
                    :request '{[_ pid cid body] :ataraxy/result}
-                   :tx-data '[{:db/id "tempid" :comment/id cid :comment/body body}
-                              {:post/id pid :post/comments "tempid"}]}}
+                   :args    '{:tx-data [{:db/id "tempid" :comment/id cid :comment/body body}
+                                        {:post/id pid :post/comments "tempid"}]}}}
           handler (::datomic/insert (ig/init config))]
       (is (= (handler {:ataraxy/result [{} 1 5 "New comment!!"]})
              {:status 201, :headers {}, :body nil}))

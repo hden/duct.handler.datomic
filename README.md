@@ -121,7 +121,7 @@ header created from the generated ID of a transaction. For example:
 {[:duct.handler.datomic/insert :example.handler.product/create]
  {:db       #ig/ref :duct.database/datomic
   :request  {{:strs [id name]} :form-params}
-  :tx-data  [{:product/id id :product/name name}]
+  :args     {:tx-data [{:product/id id :product/name name}]
   :location "/products{/id}"}}
 ```
 
@@ -139,12 +139,12 @@ For example:
 {[:duct.handler.datomic/execute :example.handler.product/update]
  {:db      #ig/ref :duct.database/datomic
   :request {[_ id name] :ataraxy/result}
-  :tx-data [{:product/id id :product/name name}]}
+  :args    {:tx-data [{:product/id id :product/name name}]}
 
  [:duct.handler.datomic/execute :example.handler.product/destroy]
  {:db      #ig/ref :duct.database/datomic
   :request {[_ id] :ataraxy/result}
-  :tx-data [[:db/retractEntity [:product/id id]]]}}
+  :args    {:tx-data [[:db/retractEntity [:product/id id]]]}}
 ```
 
 [tempids]: https://docs.datomic.com/cloud/transactions/transaction-processing.html#tempid-resolution
@@ -188,16 +188,16 @@ something like:
 
  [:duct.handler.datomic/insert :example.handler.product/create]
  {:request  {[_ id name] :ataraxy/result}
-  :tx-data  [{:product/id id :product/name name}]
+  :args     {:tx-data [{:product/id id :product/name name}]
   :location "/products{/id}"}
 
  [:duct.handler.datomic/execute :example.handler.product/update]
  {:request {[_ id name] :ataraxy/result}
-  :tx-data [{:product/id id :product/name name}]}
+  :args    {:tx-data [{:product/id id :product/name name}]}
 
  [:duct.handler.datomic/execute :example.handler.product/destroy]
  {:request {[_ id] :ataraxy/result}
-  :tx-data [[:db/retractEntity [:product/id id]]]}}
+  :args    {:tx-data [[:db/retractEntity [:product/id id]]]}}
 ```
 
 Note that the `:db` key can be omitted in this case, because the
@@ -234,7 +234,7 @@ This example might look harmless, but I assure you that it's not.
 
  [:duct.handler.datomic/execute :example.handler.product/destroy]
  {:request {[_ id] :ataraxy/result}
-  :tx-data [[:db/retractEntity id]]}}
+  :args    {:tx-data [[:db/retractEntity id]]}}
 ```
 
 When people calls your API endpoint with DELETE `/products/17592186045422`, how
@@ -250,7 +250,7 @@ Here is a better way:
 
  [:duct.handler.datomic/execute :example.handler.product/destroy]
  {:request {[_ id] :ataraxy/result}
-  :tx-data [[:db/retractEntity [:product/id id]]]}}
+  :args    {:tx-data [[:db/retractEntity [:product/id id]]]}}
 ```
 
 ## License

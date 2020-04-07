@@ -9,7 +9,7 @@ Ported from [duct.handler.sql](https://github.com/duct-framework/handler.sql)).
 To install, add the following to your project dependencies:
 
 ```
-[hden/duct.handler.datomic "0.1.0-SNAPSHOT"]
+[hden/duct.handler.datomic "0.1.0"]
 ```
 
 ## Usage

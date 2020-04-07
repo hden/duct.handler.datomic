@@ -1,4 +1,4 @@
-(defproject hden/duct.handler.datomic "0.1.0-SNAPSHOT"
+(defproject hden/duct.handler.datomic "0.1.0"
   :description "Duct library for building simple database-driven handlers"
   :url "http://example.com/FIXME"
   :license {:name "EPL-2.0"

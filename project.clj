@@ -13,5 +13,5 @@
   :repl-options {:init-ns duct.handler.datomic}
   :plugins [[lein-cloverage "1.1.2"]]
   :profiles
-  {:dev {:dependencies [[datomic-client-memdb "1.0.1"]
+  {:dev {:dependencies [[datomic-client-memdb "1.1.1"]
                         [duct/core "0.8.0"]]}})

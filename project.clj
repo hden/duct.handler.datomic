@@ -7,7 +7,7 @@
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [com.datomic/client-cloud]
                  [duct/handler.sql "0.4.0"]
-                 [hden/duct.database.datomic "0.1.0"]
+                 [hden/duct.database.datomic "0.2.0"]
                  [integrant "0.8.0"]]
   :repositories [["datomic-cloud" "s3://datomic-releases-1fc2183a/maven/releases"]]
   :repl-options {:init-ns duct.handler.datomic}

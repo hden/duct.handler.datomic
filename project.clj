@@ -11,7 +11,7 @@
                  [integrant "0.8.0"]]
   :repositories [["datomic-cloud" "s3://datomic-releases-1fc2183a/maven/releases"]]
   :repl-options {:init-ns duct.handler.datomic}
-  :plugins [[lein-cloverage "1.2.3"]]
+  :plugins [[lein-cloverage "1.2.4"]]
   :profiles
   {:dev {:dependencies [[datomic-client-memdb "1.1.1"]
                         [duct/core "0.8.0"]]}})

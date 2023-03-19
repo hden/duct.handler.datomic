@@ -64,7 +64,7 @@
     (let [connection (d/connect *client* {:db-name db-name})]
       (d/transact connection schema)
       (d/transact connection test-data)
-      (db/->Boundary *client* connection))))
+      (db/->Boundary *client* connection nil nil))))
 
 (deftest derive-test
   (isa? ::datomic/query     :duct.module.sql/requires-db)

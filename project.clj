@@ -14,4 +14,4 @@
   :plugins [[lein-cloverage "1.2.4"]]
   :profiles
   {:dev {:dependencies [[datomic-client-memdb "1.1.1"]
-                        [duct/core "0.8.0"]]}})
+                        [duct/core "0.8.1"]]}})

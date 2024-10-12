@@ -8,7 +8,7 @@
                  [com.datomic/client-cloud]
                  [duct/handler.sql "0.4.0"]
                  [hden/duct.database.datomic "0.3.1"]
-                 [integrant "0.12.0"]]
+                 [integrant "0.12.1"]]
   :repositories [["datomic-cloud" "s3://datomic-releases-1fc2183a/maven/releases"]]
   :repl-options {:init-ns duct.handler.datomic}
   :plugins [[lein-cloverage "1.2.4"]]

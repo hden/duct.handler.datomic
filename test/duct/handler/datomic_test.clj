@@ -2,12 +2,11 @@
   (:require [clojure.test :refer :all]
             [compute.datomic-client-memdb.core :as memdb]
             [datomic.client.api :as d]
-            [duct.core :as duct]
             [duct.database.datomic :as db]
             [duct.handler.datomic :as datomic]
             [integrant.core :as ig]))
 
-(duct/load-hierarchy)
+(ig/load-hierarchy)
 
 (def ^:dynamic *client* nil)
 
@@ -67,14 +66,12 @@
       (db/->Boundary *client* connection nil nil))))
 
 (deftest derive-test
-  (isa? ::datomic/query     :duct.module.sql/requires-db)
-  (isa? ::datomic/query-one :duct.module.sql/requires-db)
-  (isa? ::datomic/execute   :duct.module.sql/requires-db)
-  (isa? ::datomic/insert    :duct.module.sql/requires-db))
+  (doseq [handler [::datomic/query ::datomic/query-one ::datomic/execute ::datomic/insert]]
+    (is (isa? handler :duct.handler/datomic))))
 
-(deftest prep-test
+(deftest expand-test
   (testing "query"
-    (is (= (ig/prep {::datomic/query
+    (is (= (ig/expand {::datomic/query
                      {:query '[:find (pull ?e [*])
                                :where [?e :comment/id _]]}})
            {::datomic/query
@@ -83,13 +80,13 @@
                       :where [?e :comment/id _]]}})))
 
   (testing "query-one"
-    (is (= (ig/prep {::datomic/query
+    (is (= (ig/expand {::datomic/query-one
                      {:request '{{:keys [id]} :route-params}
                       :query   '[:find (pull ?e [:post/subject :post/body])
                                  :in $ ?id
                                  :where [?e :post/id ?id]]
                       :args    '[id]}})
-           {::datomic/query
+           {::datomic/query-one
             {:db      (ig/ref :duct.database/datomic)
              :request '{{:keys [id]} :route-params}
              :query   '[:find (pull ?e [:post/subject :post/body])
@@ -98,21 +95,21 @@
              :args    '[id]}})))
 
   (testing "execute"
-    (is (= (ig/prep {::datomic/query
+    (is (= (ig/expand {::datomic/execute
                      {:request '{{:keys [id]} :route-params, {:strs [body]} :form-params}
                       :args    '{:tx-data [{:comment/id id :comment/body body}]}}})
-           {::datomic/query
+           {::datomic/execute
             {:db      (ig/ref :duct.database/datomic)
              :request '{{:keys [id]} :route-params, {:strs [body]} :form-params}
              :args    '{:tx-data [{:comment/id id :comment/body body}]}}})))
 
   (testing "insert"
-    (is (= (ig/prep {::datomic/query
+    (is (= (ig/expand {::datomic/insert
                      {:request  '{[_ pid cid body] :ataraxy/result}
                       :args     '{:tx-data [{:db/id "tempid" :comment/id cid :comment/body body}
                                             {:post/id pid :post/comments "tempid"}]}
                       :location "/posts{/pid}/comments{/cid}"}})
-           {::datomic/query
+           {::datomic/insert
             {:db       (ig/ref :duct.database/datomic)
              :request  '{[_ pid cid body] :ataraxy/result}
              :args     '{:tx-data [{:db/id "tempid" :comment/id cid :comment/body body}
@@ -121,17 +118,20 @@
 
 (deftest query-test
   (testing "with destructuring"
-    (let [config  {::datomic/query
+    (let [key     [::datomic/query ::list-comments]
+          config  {key
                    {:db      (create-database)
-                    :request '{[_ post-id] :ataraxy/result}
+                    :request '{{:keys [:post-id]} :route-params}
                     :args    '[post-id]
+                    :hrefs   {:post "/posts{/postid}"}
                     :query   '[:find (pull ?comment [:comment/body])
                                :in $ ?post-id
                                :where [?post :post/id ?post-id]
                                       [?post :post/comments ?comment]]}}
-          handler (::datomic/query (ig/init config))]
-      (is (= (handler {:ataraxy/result [{} 1]})
-             {:status 200, :headers {}, :body '({:comment/body "Great!"} {:comment/body "Rubbish!"})}))))
+          handler (get (ig/init (ig/expand config)) key)]
+      (is (= (handler {:route-params {:post-id 1}})
+             {:status 200, :headers {}, :body '({:comment/body "Great!" :post "/posts/1"}
+                                                {:comment/body "Rubbish!" :post "/posts/1"})}))))
 
   (testing "without destructuring"
     (let [config  {::datomic/query

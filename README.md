@@ -39,7 +39,7 @@ identifier for the handler.
 The `:db` option should be a `duct.database.datomic.Boundary` record, and
 the `:query` option should be a [datalog query][] form.
 
-If you omit the `:db` option, the `ig/prep` stage will default it to
+If you omit the `:db` option, the `ig/expand` stage will default it to
 `#ig/ref :duct.database/datomic`. This means you can write:
 
 ```clojure
@@ -149,60 +149,28 @@ For example:
 
 [tempids]: https://docs.datomic.com/cloud/transactions/transaction-processing.html#tempid-resolution
 
-### Full Example
+### Initializing with Integrant
 
-Together with a router like Ataraxy, the configuration might look
-something like:
+Load the handler namespace and hierarchy before expanding the configuration.
+Supply your Datomic client and connection options under `:duct.database/datomic`.
 
 ```clojure
-{:duct.core/project-ns example
- :duct.core/environment :production
+(require '[duct.handler.datomic]
+         '[integrant.core :as ig])
 
- :duct.module.web/api {}
- :duct.module/sql     {}
+(ig/load-hierarchy)
 
- :duct.module/ataraxy
- {"/products"
-  {[:get]        [:product/list]
-   [:get "/" id] [:product/find ^uuid id]
-
-   [:post {{:strs [name]} :form-params}]
-   [:product/create name]
-
-   [:put "/" id {{:strs [name]} :form-params}]
-   [:product/update ^uuid id name]
-
-   [:delete "/" id]
-   [:product/destroy ^uuid id]}}
-
- [:duct.handler.datomic/query :example.handler.product/list]
- {:query [:find (pull ?e [*])
-          :where [?e :product/id _]]}
-
- [:duct.handler.datomic/query-one :example.handler.product/find]
- {:request {[_ id] :ataraxy/result}
-  :args    [id]
-  :query   [:find (pull ?e [*])
-            :in $ ?id
-            :where [?e :product/id ?id]]}
-
- [:duct.handler.datomic/insert :example.handler.product/create]
- {:request  {[_ id name] :ataraxy/result}
-  :args     {:tx-data [{:product/id id :product/name name}]
-  :location "/products{/id}"}
-
- [:duct.handler.datomic/execute :example.handler.product/update]
- {:request {[_ id name] :ataraxy/result}
-  :args    {:tx-data [{:product/id id :product/name name}]}
-
- [:duct.handler.datomic/execute :example.handler.product/destroy]
- {:request {[_ id] :ataraxy/result}
-  :args    {:tx-data [[:db/retractEntity [:product/id id]]]}}
+(defn init-system [datomic-options]
+  (-> {:duct.database/datomic datomic-options
+       [:duct.handler.datomic/query :example.handler.product/list]
+       {:query '[:find (pull ?e [*])
+                 :where [?e :product/id _]]}}
+      ig/expand
+      ig/init))
 ```
 
-Note that the `:db` key can be omitted in this case, because the
-`:duct.module/datomic` module will automatically populate the handlers
-with a database connection.
+The initialized system contains a Ring handler at the composite key
+`[:duct.handler.datomic/query :example.handler.product/list]`.
 
 ## Caveats
 

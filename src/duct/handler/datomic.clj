@@ -1,12 +1,13 @@
 (ns duct.handler.datomic
   (:refer-clojure :exclude [ex-cause])
-  (:require [clojure.string :as str]
+  (:require [clojure.set :as set]
+            [clojure.string :as str]
+            [clojure.walk :as walk]
             [datomic.client.api :as d]
-            [duct.database.datomic :as datomic.db]
-            [duct.handler.sql :as sql]
-            [integrant.core :as ig]))
-
-(defonce stash (atom {}))
+            [duct.database.datomic]
+            [integrant.core :as ig]
+            [ring.util.response :as resp]
+            [uritemplate-clj.core :as ut]))
 
 (defn- ex-cause [ex]
   (when-let [cause (or (:db/error (ex-data ex))
@@ -39,50 +40,83 @@
   (let [{:keys [tempids]} (d/transact connection args)]
     tempids))
 
-(extend-protocol sql/RelationalDatabase
-  duct.database.datomic.Boundary
-  (query [db {:keys [id] :as arg-map}]
-    (let [options (get @stash id)]
-      (query options db arg-map)))
+(defmethod ig/expand-key :duct.handler/datomic [key opts]
+  {key (if (:db opts)
+         opts
+         (assoc opts :db (ig/ref :duct.database/datomic)))})
 
-  (execute! [db {:keys [id] :as arg-map}]
-    (try
-      (let [options (get @stash id)]
-        (execute! options db arg-map))
-      (catch Exception ex
-        (if (not-found? ex)
-          [0]
-          (throw ex)))))
+(defn- request-bindings [request]
+  (let [names (into #{}
+                    (comp (filter #(or (symbol? %) (keyword? %)))
+                          (map name))
+                    (tree-seq coll? seq request))]
+    (into {}
+          (comp (filter symbol?)
+                (remove #{'_})
+                (filter #(contains? names (name %)))
+                (map (fn [binding]
+                       [(keyword (name binding)) (symbol (name binding))])))
+          (take-nth 2 (destructure [request nil])))))
 
-  (insert! [db {:keys [id] :as arg-map}]
-    (let [options (get @stash id)]
-      (insert! options db arg-map))))
+(defn- request-handler [{:keys [args request] :or {request '_} :as options} respond]
+  (let [arg-map (cond-> {:id (hash options)}
+                  args (assoc :args args))
+        build   (eval `(fn [respond#]
+                         (fn [~request]
+                           (respond# ~arg-map ~(request-bindings request)))))]
+    (build respond)))
 
-(defmethod ig/prep-key :duct.handler/datomic [_ opts]
-  (if (:db opts)
-    opts
-    (assoc opts :db (ig/ref :duct.database/datomic))))
+(defn- uri-template [template values]
+  (let [values (into {}
+                     (map (fn [[key value]]
+                            [(str/replace key #"[^\w]" "") value]))
+                     (walk/stringify-keys values))]
+    (ut/uritemplate template values)))
 
-(defn- stash-options! [{:as options :keys [args]}]
-  (let [id (hash options)]
-    (swap! stash assoc id options)
-    (-> options
-        (dissoc :query :tx-data)
-        (assoc :sql (cond-> {:id id}
-                      args (assoc :args args))))))
+(defn- transform-result [result {:keys [hrefs remove rename]} request-vars]
+  (let [vars (merge request-vars result)
+        linked (reduce-kv (fn [result key template]
+                            (assoc result key (uri-template template vars)))
+                          result
+                          hrefs)]
+    (set/rename-keys (apply dissoc linked remove) rename)))
+
+(defn- affected-count [options db args]
+  (try
+    (first (execute! options db args))
+    (catch Exception ex
+      (if (not-found? ex)
+        0
+        (throw ex)))))
 
 (defmethod ig/init-key ::query
-  [_ options]
-  (ig/init-key ::sql/query (stash-options! options)))
+  [_ {:keys [db] :as options}]
+  (request-handler options
+                   (fn [args request-vars]
+                     (resp/response (map #(transform-result % options request-vars)
+                                         (query options db args))))))
 
 (defmethod ig/init-key ::query-one
-  [_ options]
-  (ig/init-key ::sql/query-one (stash-options! options)))
+  [_ {:keys [db] :as options}]
+  (request-handler options
+                   (fn [args request-vars]
+                     (if-let [result (first (query options db args))]
+                       (resp/response (transform-result result options request-vars))
+                       (resp/not-found {:error :not-found})))))
 
 (defmethod ig/init-key ::execute
-  [_ options]
-  (ig/init-key ::sql/execute (stash-options! options)))
+  [_ {:keys [db] :as options}]
+  (request-handler options
+                   (fn [args _]
+                     (if (zero? (affected-count options db args))
+                       (resp/not-found {:error :not-found})
+                       {:status 204 :headers {} :body nil}))))
 
 (defmethod ig/init-key ::insert
-  [_ options]
-  (ig/init-key ::sql/insert (stash-options! options)))
+  [_ {:keys [db location] :as options}]
+  (request-handler options
+                   (fn [args request-vars]
+                     (let [tempids (insert! options db args)]
+                       (if location
+                         (resp/created (uri-template location (merge request-vars tempids)))
+                         {:status 201 :headers {} :body nil})))))

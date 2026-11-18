@@ -6,12 +6,12 @@
   :managed-dependencies [[com.datomic/client-cloud "1.0.137"]]
   :dependencies [[org.clojure/clojure "1.12.6"]
                  [com.datomic/client-cloud]
-                 [duct/handler.sql "0.4.0"]
+                 [ring/ring-core "1.7.1"]
+                 [uritemplate-clj "1.2.1"]
                  [hden/duct.database.datomic "0.3.1"]
-                 [integrant "0.13.1"]]
+                 [integrant "1.0.1"]]
   :repositories [["datomic-cloud" "s3://datomic-releases-1fc2183a/maven/releases"]]
   :repl-options {:init-ns duct.handler.datomic}
   :plugins [[lein-cloverage "1.2.4"]]
   :profiles
-  {:dev {:dependencies [[datomic-client-memdb "1.1.1"]
-                        [duct/core "0.8.1"]]}})
+  {:dev {:dependencies [[datomic-client-memdb "1.1.1"]]}})

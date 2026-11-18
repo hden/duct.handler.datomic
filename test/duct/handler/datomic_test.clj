@@ -117,6 +117,22 @@
              :location "/posts{/pid}/comments{/cid}"}}))))
 
 (deftest query-test
+  (testing "resolves the default database reference for a composite handler key"
+    (let [key [::datomic/query ::list-posts]
+          config {:duct.database/datomic {:database "default-db"}
+                  key {:query '[:find (pull ?e [:post/subject])
+                                :where [?e :post/id _]]}}]
+      (with-redefs [d/client (constantly *client*)]
+        (let [system (ig/init (ig/expand config))
+              connection (:connection (:duct.database/datomic system))]
+          (try
+            (d/transact connection schema)
+            (d/transact connection test-data)
+            (is (= {:status 200, :headers {}, :body [{:post/subject "Test"}]}
+                   ((get system key) {})))
+            (finally
+              (ig/halt! system)))))))
+
   (testing "with destructuring"
     (let [key     [::datomic/query ::list-comments]
           config  {key

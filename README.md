@@ -151,6 +151,10 @@ For example:
 
 ### Initializing with Integrant
 
+This version requires Integrant 1.x. When migrating an existing system, replace
+the `ig/prep` step with `ig/expand` and update any other components that still
+use `prep-key`.
+
 Load the handler namespace and hierarchy before expanding the configuration.
 Supply your Datomic client and connection options under `:duct.database/datomic`.
 
